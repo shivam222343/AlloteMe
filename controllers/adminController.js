@@ -2,87 +2,68 @@ const College = require('../models/College');
 const Cutoff = require('../models/Cutoff');
 const cloudinary = require('cloudinary').v2;
 
-// Create College
-exports.createCollege = async (req, res) => {
-    try {
-        const { name, university, state, city, address, description, fees, rating, courses, contactEmail, contactPhone, website, status, mapLink } = req.body;
-        const imageUrl = req.file ? req.file.path : '';
+// Configure Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
-        // Parse courses if sent as string
-        let parsedCourses = [];
-        if (typeof courses === 'string') {
-            try {
-                parsedCourses = JSON.parse(courses);
-            } catch (e) {
-                parsedCourses = courses.split(',').map(c => c.trim());
-            }
-        } else if (Array.isArray(courses)) {
-            parsedCourses = courses;
+// Add College with multiple images
+exports.addCollege = async (req, res) => {
+    try {
+        const collegeData = { ...req.body };
+
+        // Parse courses if it's string
+        if (typeof collegeData.courses === 'string') {
+            collegeData.courses = JSON.parse(collegeData.courses);
         }
 
-        const college = new College({
-            name,
-            university,
-            state,
-            city,
-            address,
-            description,
-            fees: parseFloat(fees) || 0,
-            rating: parseFloat(rating) || 0,
-            image: imageUrl,
-            courses: parsedCourses,
-            contactEmail,
-            contactPhone,
-            website,
-            status: status || 'Active',
-            mapLink
-        });
+        // Upload multiple images to Cloudinary
+        const imageUrls = [];
+        if (req.files && req.files.length > 0) {
+            for (const file of req.files) {
+                const result = await cloudinary.uploader.upload(file.path, {
+                    folder: 'colleges',
+                    transformation: [
+                        { width: 800, height: 600, crop: 'limit' },
+                        { quality: 'auto' }
+                    ]
+                });
+                imageUrls.push(result.secure_url);
+            }
+        }
 
+        collegeData.images = imageUrls;
+
+        const college = new College(collegeData);
         await college.save();
-        res.json({ success: true, data: college });
+
+        res.json({ success: true, message: 'College added successfully', data: college });
     } catch (error) {
-        console.error('Create college error:', error);
+        console.error('Add college error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Get Colleges (with pagination and search)
-exports.getColleges = async (req, res) => {
+// Get all colleges
+exports.getAllColleges = async (req, res) => {
     try {
-        const { page = 1, limit = 20, search = '' } = req.query;
-        const query = search ? { name: { $regex: search, $options: 'i' } } : {};
-
-        const colleges = await College.find(query)
-            .sort({ createdAt: -1 })
-            .limit(limit * 1)
-            .skip((page - 1) * limit);
-
-        const count = await College.countDocuments(query);
-
-        res.json({
-            success: true,
-            data: colleges,
-            totalPages: Math.ceil(count / limit),
-            currentPage: page,
-            total: count
-        });
+        const colleges = await College.find().sort({ createdAt: -1 });
+        res.json({ success: true, data: colleges });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Get Single College
-exports.getCollegeById = async (req, res) => {
+// Get single college
+exports.getCollege = async (req, res) => {
     try {
         const college = await College.findById(req.params.id);
         if (!college) {
             return res.status(404).json({ success: false, message: 'College not found' });
         }
-
-        // Fetch associated cutoffs
-        const cutoffs = await Cutoff.find({ collegeId: college._id }).sort({ year: -1, round: 1 });
-
-        res.json({ success: true, data: { college, cutoffs } });
+        res.json({ success: true, data: college });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -91,28 +72,39 @@ exports.getCollegeById = async (req, res) => {
 // Update College
 exports.updateCollege = async (req, res) => {
     try {
-        const updates = { ...req.body };
+        const updateData = { ...req.body };
 
-        // Handle new image upload
-        if (req.file) {
-            updates.image = req.file.path;
+        if (typeof updateData.courses === 'string') {
+            updateData.courses = JSON.parse(updateData.courses);
         }
 
-        // Parse courses if needed
-        if (updates.courses && typeof updates.courses === 'string') {
-            try {
-                updates.courses = JSON.parse(updates.courses);
-            } catch (e) {
-                updates.courses = updates.courses.split(',').map(c => c.trim());
+        // Upload new images if provided
+        if (req.files && req.files.length > 0) {
+            const imageUrls = [];
+            for (const file of req.files) {
+                const result = await cloudinary.uploader.upload(file.path, {
+                    folder: 'colleges',
+                    transformation: [
+                        { width: 800, height: 600, crop: 'limit' },
+                        { quality: 'auto' }
+                    ]
+                });
+                imageUrls.push(result.secure_url);
             }
+            updateData.images = imageUrls;
         }
 
-        const college = await College.findByIdAndUpdate(req.params.id, updates, { new: true });
+        const college = await College.findByIdAndUpdate(
+            req.params.id,
+            updateData,
+            { new: true, runValidators: true }
+        );
+
         if (!college) {
             return res.status(404).json({ success: false, message: 'College not found' });
         }
 
-        res.json({ success: true, data: college });
+        res.json({ success: true, message: 'College updated', data: college });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -126,74 +118,46 @@ exports.deleteCollege = async (req, res) => {
             return res.status(404).json({ success: false, message: 'College not found' });
         }
 
-        // Delete associated cutoffs
-        await Cutoff.deleteMany({ collegeId: req.params.id });
-
-        res.json({ success: true, message: 'College deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-};
-
-// Add Cutoff to College
-exports.addCutoff = async (req, res) => {
-    try {
-        const { examType, year, round, branch, category, openingRank, closingRank, percentile, seatType } = req.body;
-
-        const cutoff = new Cutoff({
-            collegeId: req.params.id,
-            examType,
-            year: parseInt(year),
-            round: parseInt(round),
-            branch,
-            category,
-            openingRank: openingRank ? parseInt(openingRank) : null,
-            closingRank: parseInt(closingRank),
-            percentile: percentile ? parseFloat(percentile) : null,
-            seatType: seatType || 'State'
-        });
-
-        await cutoff.save();
-        res.json({ success: true, data: cutoff });
-    } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({ success: false, message: 'Duplicate cutoff entry' });
+        // Delete images from Cloudinary
+        if (college.images && college.images.length > 0) {
+            for (const imageUrl of college.images) {
+                try {
+                    const publicId = imageUrl.split('/').pop().split('.')[0];
+                    await cloudinary.uploader.destroy(`colleges/${publicId}`);
+                } catch (err) {
+                    console.error('Error deleting image:', err);
+                }
+            }
         }
+
+        res.json({ success: true, message: 'College deleted' });
+    } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Get Cutoffs by College
-exports.getCutoffsByCollege = async (req, res) => {
+// Get college cutoffs
+exports.getCollegeCutoffs = async (req, res) => {
     try {
-        const cutoffs = await Cutoff.find({ collegeId: req.params.id }).sort({ year: -1, round: 1, branch: 1 });
+        const cutoffs = await Cutoff.find({ collegeId: req.params.id }).sort({ year: -1, round: 1 });
         res.json({ success: true, data: cutoffs });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Update Cutoff
-exports.updateCutoff = async (req, res) => {
+// Add cutoff
+exports.addCutoff = async (req, res) => {
     try {
-        const cutoff = await Cutoff.findByIdAndUpdate(req.params.cutoffId, req.body, { new: true });
-        if (!cutoff) {
-            return res.status(404).json({ success: false, message: 'Cutoff not found' });
-        }
-        res.json({ success: true, data: cutoff });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-};
+        const cutoffData = {
+            ...req.body,
+            collegeId: req.params.id
+        };
 
-// Delete Cutoff
-exports.deleteCutoff = async (req, res) => {
-    try {
-        const cutoff = await Cutoff.findByIdAndDelete(req.params.cutoffId);
-        if (!cutoff) {
-            return res.status(404).json({ success: false, message: 'Cutoff not found' });
-        }
-        res.json({ success: true, message: 'Cutoff deleted successfully' });
+        const cutoff = new Cutoff(cutoffData);
+        await cutoff.save();
+
+        res.json({ success: true, message: 'Cutoff added', data: cutoff });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

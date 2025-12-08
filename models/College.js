@@ -10,13 +10,14 @@ const collegeSchema = new mongoose.Schema({
     description: { type: String, default: '' },
     fees: { type: Number, default: 0 },
     rating: { type: Number, min: 0, max: 5, default: 0 },
-    image: { type: String, default: '' }, // Cloudinary URL
+    images: [{ type: String }], // Array of Cloudinary URLs
     courses: [{ type: String }], // Array of course names
     contactEmail: { type: String, default: '' },
     contactPhone: { type: String, default: '' },
     website: { type: String, default: '' },
-    status: { type: String, default: 'Active' }, // Active, Inactive, Autonomous
-    mapLink: { type: String, default: '' }
+    collegeStatus: { type: String, default: 'Autonomous' }, // Autonomous, Government, etc.
+    status: { type: String, default: 'Active' }, // Active/Inactive
+    mapLink: { type: String, default: '' } // Google Maps link
 }, { timestamps: true });
 
 module.exports = mongoose.model('College', collegeSchema);
