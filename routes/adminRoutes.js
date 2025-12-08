@@ -6,6 +6,10 @@ const adminController = require('../controllers/adminController');
 // Configure multer for multiple files (max 5 images)
 const upload = multer({ dest: 'uploads/' });
 
+// Admin authentication routes
+router.post('/login', adminController.login);
+router.post('/register', adminController.register);
+
 // College routes
 router.get('/colleges', adminController.getAllColleges);
 router.get('/colleges/:id', adminController.getCollege);

@@ -9,6 +9,46 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+// Admin Login
+exports.login = async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        // Simple hardcoded auth (replace with proper auth later)
+        if (username === 'admin' && password === 'admin123') {
+            res.json({
+                success: true,
+                message: 'Login successful',
+                data: { username, role: 'admin' }
+            });
+        } else {
+            res.status(401).json({ success: false, message: 'Invalid credentials' });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Admin Register
+exports.register = async (req, res) => {
+    try {
+        const { username, password, key } = req.body;
+
+        // Simple hardcoded registration with admin key
+        if (key === 'ADMIN_KEY_2024') {
+            res.json({
+                success: true,
+                message: 'Registration successful',
+                data: { username, role: 'admin' }
+            });
+        } else {
+            res.status(400).json({ success: false, message: 'Invalid admin key' });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 // Add College with multiple images
 exports.addCollege = async (req, res) => {
     try {
