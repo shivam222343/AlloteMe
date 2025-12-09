@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const HomeBanner = require('../models/HomeBanner');
 
-// Get all active banners
+const upload = require('../utils/upload');
+
+// Get all activebanners
 router.get('/', async (req, res) => {
     try {
         const banners = await HomeBanner.find({ isActive: true }).sort({ order: 1 });
@@ -13,9 +15,20 @@ router.get('/', async (req, res) => {
 });
 
 // Create a banner
-router.post('/', async (req, res) => {
+router.post('/', upload.single('image'), async (req, res) => {
     try {
-        const banner = new HomeBanner(req.body);
+        let imageUrl = req.body.imageUrl;
+        // If file uploaded, use cloud path
+        if (req.file && req.file.path) {
+            imageUrl = req.file.path;
+        }
+
+        const bannerData = {
+            ...req.body,
+            imageUrl: imageUrl // Override/Set image url
+        };
+
+        const banner = new HomeBanner(bannerData);
         await banner.save();
         res.status(201).json({ success: true, data: banner });
     } catch (error) {
