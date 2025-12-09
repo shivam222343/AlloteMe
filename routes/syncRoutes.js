@@ -9,7 +9,11 @@ router.get('/colleges', async (req, res) => {
         const { lastSync } = req.query;
         const query = lastSync ? { updatedAt: { $gt: new Date(parseInt(lastSync)) } } : {};
 
+        console.log(`[SYNC] Fetching colleges - lastSync: ${lastSync || 'none'}`);
+
         const colleges = await College.find(query).select('-__v').lean();
+
+        console.log(`[SYNC] Found ${colleges.length} colleges to sync`);
 
         res.json({
             success: true,
@@ -17,6 +21,7 @@ router.get('/colleges', async (req, res) => {
             timestamp: Date.now()
         });
     } catch (error) {
+        console.error('[SYNC] Error fetching colleges:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
