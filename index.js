@@ -31,6 +31,8 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/getcounse
 app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/sync', syncRoutes);
+app.use('/api/colleges', require('./routes/collegeRoutes'));
+app.use('/api/cutoffs', require('./routes/cutoffRoutes'));
 
 app.get('/', (req, res) => {
     res.send('GetCounsel API is running');

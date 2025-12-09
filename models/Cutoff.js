@@ -3,17 +3,26 @@ const mongoose = require('mongoose');
 const cutoffSchema = new mongoose.Schema({
     collegeId: { type: mongoose.Schema.Types.ObjectId, ref: 'College', required: true },
     examType: { type: String, required: true, enum: ['MHTCET', 'JEE', 'NEET'] },
-    year: { type: Number, required: true, min: 2020 },
-    round: { type: Number, required: true, min: 1, max: 5 },
+    year: { type: Number, required: true },
+    round: { type: Number, required: true },
     branch: { type: String, required: true },
-    category: { type: String, required: true, enum: ['OPEN', 'OBC', 'SC', 'ST', 'EWS', 'NT'] },
-    openingRank: { type: Number, default: null },
-    closingRank: { type: Number, required: true },
-    percentile: { type: Number, default: null },
-    seatType: { type: String, enum: ['State', 'All India'], default: 'State' }
+
+    // Category Details
+    category: { type: String, required: true }, // OPEN, OBC, SC, ST, etc.
+    subCategory: { type: String, default: 'General' }, // Male, Female, Home State, etc.
+    casteGroup: { type: String }, // General, Reserved (Optional)
+
+    // Seat Information
+    seatType: { type: String, required: true }, // AI, HS, OS, TFWS, etc.
+
+    // Cutoff Data
+    percentile: { type: Number, required: true },
+    openingRank: { type: Number },
+    closingRank: { type: Number },
+
 }, { timestamps: true });
 
-// Compound index to prevent duplicate cutoffs
+// Compound index to ensure uniqueness of a specific cutoff entry
 cutoffSchema.index({ collegeId: 1, examType: 1, year: 1, round: 1, branch: 1, category: 1, seatType: 1 }, { unique: true });
 
 module.exports = mongoose.model('Cutoff', cutoffSchema);
