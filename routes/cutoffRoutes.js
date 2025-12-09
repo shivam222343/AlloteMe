@@ -125,4 +125,29 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// Delete cutoffs batch (by college, exam, year)
+router.post('/delete-batch', async (req, res) => {
+    try {
+        const { collegeId, examType, year } = req.body;
+
+        if (!collegeId || !examType || !year) {
+            return res.status(400).json({ success: false, message: 'Missing required fields: collegeId, examType, year' });
+        }
+
+        const result = await Cutoff.deleteMany({
+            collegeId: collegeId,
+            examType: examType,
+            year: year
+        });
+
+        res.json({
+            success: true,
+            message: `Successfully deleted ${result.deletedCount} cutoffs for ${examType} ${year}`,
+            deletedCount: result.deletedCount
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 module.exports = router;
