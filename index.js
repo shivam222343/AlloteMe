@@ -33,6 +33,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/colleges', require('./routes/collegeRoutes'));
 app.use('/api/cutoffs', require('./routes/cutoffRoutes'));
+app.use('/api/banners', require('./routes/bannerRoutes'));
 
 app.get('/', (req, res) => {
     res.send('GetCounsel API is running');

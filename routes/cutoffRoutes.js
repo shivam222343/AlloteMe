@@ -55,6 +55,43 @@ router.get('/college/:collegeId', async (req, res) => {
     }
 });
 
+// Bulk upload cutoffs
+router.post('/bulk', async (req, res) => {
+    try {
+        const cutoffs = req.body;
+        if (!Array.isArray(cutoffs)) {
+            return res.status(400).json({ success: false, message: 'Input must be an array of cutoffs' });
+        }
+
+        // Use ordered: false to prevent stopping on duplicate errors
+        try {
+            const result = await Cutoff.insertMany(cutoffs, { ordered: false });
+            res.status(201).json({
+                success: true,
+                message: `Successfully inserted ${result.length} cutoffs`,
+                count: result.length
+            });
+        } catch (error) {
+            // Handle partial insertion (Mongoose throws error if even one fails, but docs inserted are in error.insertedDocs)
+            if (error.code === 11000 || error.writeErrors) {
+                const insertedCount = error.insertedDocs ? error.insertedDocs.length : 0;
+                // If the error object has 'result' (depending on Mongoose version), it might be there too
+                // Generally with ordered: false, it throws on the end.
+                res.status(207).json({
+                    success: true,
+                    message: `Partial success: ${insertedCount} inserted. duplicates/errors: ${cutoffs.length - insertedCount}`,
+                    count: insertedCount,
+                    warnings: error.writeErrors
+                });
+            } else {
+                throw error;
+            }
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 // Add a new cutoff
 router.post('/', async (req, res) => {
     try {

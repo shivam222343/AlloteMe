@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const collegeSchema = new mongoose.Schema({
     collegeId: { type: Number, unique: true, sparse: true }, // Optional sync ID for Android
     name: { type: String, required: true },
+    code: { type: String, default: '' }, // College Code (e.g., 6006)
     university: { type: String, default: '' },
     state: { type: String, default: '' },
     city: { type: String, default: '' },
@@ -17,6 +18,7 @@ const collegeSchema = new mongoose.Schema({
     website: { type: String, default: '' },
     collegeStatus: { type: String, default: 'Autonomous' }, // Autonomous, Government, etc.
     status: { type: String, default: 'Active' }, // Active/Inactive
+    isFeatured: { type: Boolean, default: false }, // Featured on Home Screen
     mapLink: { type: String, default: '' } // Google Maps link
 }, { timestamps: true });
 
