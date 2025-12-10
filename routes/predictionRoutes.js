@@ -9,6 +9,9 @@ const Cutoff = require('../models/Cutoff');
  */
 router.post('/', async (req, res) => {
     try {
+        console.log('=== PREDICTION REQUEST RECEIVED ===');
+        console.log('Request Body:', JSON.stringify(req.body, null, 2));
+
         const {
             examType,
             percentile,
@@ -22,8 +25,16 @@ router.post('/', async (req, res) => {
             collegeStatuses
         } = req.body;
 
-        // Validation
-        if (!examType || !percentile || !year || !round || !category || !seatType) {
+        // Validation - check for null/undefined, not falsy (0 is valid!)
+        if (!examType || percentile == null || year == null || round == null || !category || !seatType) {
+            console.error('Validation failed - missing fields:', {
+                examType: !!examType,
+                percentile: percentile != null,
+                year: year != null,
+                round: round != null,
+                category: !!category,
+                seatType: !!seatType
+            });
             return res.status(400).json({
                 success: false,
                 message: 'Missing required fields'
@@ -44,9 +55,19 @@ router.post('/', async (req, res) => {
         const maxPercentile = percentile + toleranceRange;
         query.percentile = { $gte: minPercentile, $lte: maxPercentile };
 
-        // Optional filters
+        // Optional filters with fuzzy branch matching
         if (preferredBranches && preferredBranches.length > 0) {
-            query.branch = { $in: preferredBranches };
+            // Create regex patterns for fuzzy matching
+            // E.g., "Computer Engineering" will match "Computer Science & Engineering"
+            const branchPatterns = preferredBranches.map(branch => {
+                // Split by common separators and create flexible pattern
+                const keywords = branch.split(/[\s&-]+/).filter(k => k.length > 2);
+                // Match if branch contains all keywords (order-independent, case-insensitive)
+                const pattern = keywords.map(kw => `(?=.*${kw})`).join('');
+                return new RegExp(pattern, 'i');
+            });
+
+            query.branch = { $in: branchPatterns };
         }
 
         console.log('Prediction Query:', JSON.stringify(query, null, 2));

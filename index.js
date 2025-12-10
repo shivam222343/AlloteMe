@@ -34,7 +34,8 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/colleges', require('./routes/collegeRoutes'));
 app.use('/api/cutoffs', require('./routes/cutoffRoutes'));
 app.use('/api/banners', require('./routes/bannerRoutes'));
-app.use('/api/predict', require('./routes/predictionRoutes')); // NEW: Prediction endpoint
+app.use('/api/predict', require('./routes/predictionRoutes')); // Prediction endpoint
+app.use('/api/search-cutoffs', require('./routes/searchCutoffsRoutes')); // Search cutoffs for add dialog
 
 app.get('/', (req, res) => {
     res.send('GetCounsel API is running');
