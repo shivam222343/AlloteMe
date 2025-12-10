@@ -34,6 +34,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/colleges', require('./routes/collegeRoutes'));
 app.use('/api/cutoffs', require('./routes/cutoffRoutes'));
 app.use('/api/banners', require('./routes/bannerRoutes'));
+app.use('/api/predict', require('./routes/predictionRoutes')); // NEW: Prediction endpoint
 
 app.get('/', (req, res) => {
     res.send('GetCounsel API is running');
