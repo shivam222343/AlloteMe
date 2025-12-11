@@ -47,4 +47,14 @@ router.get('/cutoffs', async (req, res) => {
     }
 });
 
+// GET /api/sync/cutoffs/count - Get total count of cutoffs
+router.get('/cutoffs/count', async (req, res) => {
+    try {
+        const count = await Cutoff.countDocuments();
+        res.json({ success: true, count });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
 module.exports = router;

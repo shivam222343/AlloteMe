@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const Feedback = require('../models/Feedback');
 
 // In-memory storage (replace with MongoDB model later)
 let feedbacks = [];
@@ -28,18 +29,15 @@ router.post('/', async (req, res) => {
             });
         }
 
-        const feedback = {
-            id: feedbackIdCounter++,
+        const feedback = new Feedback({
             rating: parseInt(rating),
             message,
             userEmail,
-            status: 'pending', // pending, approved, rejected
-            isVisible: false, // Only visible when approved
-            createdAt: new Date(),
-            approvedAt: null
-        };
+            status: 'pending',
+            isVisible: false
+        });
 
-        feedbacks.push(feedback);
+        await feedback.save();
 
         res.status(201).json({
             success: true,
@@ -61,10 +59,12 @@ router.post('/', async (req, res) => {
  */
 router.get('/approved', async (req, res) => {
     try {
-        const approvedFeedbacks = feedbacks
-            .filter(f => f.status === 'approved' && f.isVisible)
-            .sort((a, b) => new Date(b.approvedAt) - new Date(a.approvedAt))
-            .slice(0, 10); // Limit to 10 most recent
+        const approvedFeedbacks = await Feedback.find({
+            status: 'approved',
+            isVisible: true
+        })
+            .sort({ approvedAt: -1 })
+            .limit(10);
 
         res.json({
             success: true,
@@ -86,13 +86,16 @@ router.get('/approved', async (req, res) => {
  */
 router.get('/all', async (req, res) => {
     try {
+        const allFeedbacks = await Feedback.find()
+            .sort({ createdAt: -1 });
+
         res.json({
             success: true,
-            count: feedbacks.length,
-            data: feedbacks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            count: allFeedbacks.length,
+            data: allFeedbacks
         });
     } catch (error) {
-        console.error('Error fetching feedbacks:', error);
+        console.error('Error fetching all feedbacks:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch feedbacks'
@@ -106,8 +109,15 @@ router.get('/all', async (req, res) => {
  */
 router.put('/:id/approve', async (req, res) => {
     try {
-        const feedbackId = parseInt(req.params.id);
-        const feedback = feedbacks.find(f => f.id === feedbackId);
+        const feedback = await Feedback.findByIdAndUpdate(
+            req.params.id,
+            {
+                status: 'approved',
+                isVisible: true,
+                approvedAt: new Date()
+            },
+            { new: true }
+        );
 
         if (!feedback) {
             return res.status(404).json({
@@ -115,10 +125,6 @@ router.put('/:id/approve', async (req, res) => {
                 message: 'Feedback not found'
             });
         }
-
-        feedback.status = 'approved';
-        feedback.isVisible = true;
-        feedback.approvedAt = new Date();
 
         res.json({
             success: true,
@@ -140,8 +146,14 @@ router.put('/:id/approve', async (req, res) => {
  */
 router.put('/:id/reject', async (req, res) => {
     try {
-        const feedbackId = parseInt(req.params.id);
-        const feedback = feedbacks.find(f => f.id === feedbackId);
+        const feedback = await Feedback.findByIdAndUpdate(
+            req.params.id,
+            {
+                status: 'rejected',
+                isVisible: false
+            },
+            { new: true }
+        );
 
         if (!feedback) {
             return res.status(404).json({
@@ -149,9 +161,6 @@ router.put('/:id/reject', async (req, res) => {
                 message: 'Feedback not found'
             });
         }
-
-        feedback.status = 'rejected';
-        feedback.isVisible = false;
 
         res.json({
             success: true,
@@ -173,17 +182,14 @@ router.put('/:id/reject', async (req, res) => {
  */
 router.delete('/:id', async (req, res) => {
     try {
-        const feedbackId = parseInt(req.params.id);
-        const index = feedbacks.findIndex(f => f.id === feedbackId);
+        const feedback = await Feedback.findByIdAndDelete(req.params.id);
 
-        if (index === -1) {
+        if (!feedback) {
             return res.status(404).json({
                 success: false,
                 message: 'Feedback not found'
             });
         }
-
-        feedbacks.splice(index, 1);
 
         res.json({
             success: true,
