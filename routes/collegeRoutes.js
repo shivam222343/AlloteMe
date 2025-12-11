@@ -12,6 +12,21 @@ router.get('/', async (req, res) => {
     }
 });
 
+// Get featured colleges for home screen carousel
+router.get('/featured', async (req, res) => {
+    try {
+        // For now, return colleges with highest rating
+        // Later, add isFeatured field to College model
+        const featuredColleges = await College.find()
+            .sort({ rating: -1 })
+            .limit(5);
+        res.json({ success: true, data: featuredColleges });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+
 // Get single college
 router.get('/:id', async (req, res) => {
     try {

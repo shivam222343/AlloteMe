@@ -41,14 +41,26 @@ router.post('/', async (req, res) => {
             });
         }
 
-        // Build MongoDB query
+        // Build MongoDB query with flexible matching for category and seat type
         const query = {
             examType,
             year: parseInt(year),
-            round: parseInt(round),
-            category,
-            seatType
+            round: parseInt(round)
         };
+
+        // Flexible category matching - allows partial matches
+        // E.g., "NT2" will match "GNT2", "LNT2", "GNT2-S", etc.
+        if (category) {
+            // Create regex pattern that matches if category appears anywhere in the field
+            // Case-insensitive matching
+            query.category = new RegExp(category, 'i');
+        }
+
+        // Flexible seat type matching - allows partial matches  
+        // E.g., "SL" will match "State", "GOPENS" will match variations, etc.
+        if (seatType) {
+            query.seatType = new RegExp(seatType, 'i');
+        }
 
         // Add percentile range filter
         const minPercentile = percentile - toleranceRange;
