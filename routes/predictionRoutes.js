@@ -45,7 +45,7 @@ router.post('/', async (req, res) => {
         const query = {
             examType,
             year: parseInt(year),
-            round: parseFloat(round),
+            round: parseInt(round),
             category,
             seatType
         };
@@ -57,25 +57,33 @@ router.post('/', async (req, res) => {
 
         // Optional filters with fuzzy branch matching
         if (preferredBranches && preferredBranches.length > 0) {
-            // Create regex patterns for fuzzy matching
-            // E.g., "Computer Engineering" will match "Computer Science & Engineering"
-            const branchPatterns = preferredBranches.map(branch => {
-                // Split by common separators and create flexible pattern
-                const keywords = branch.split(/[\s&-]+/).filter(k => k.length > 2);
-                // Match if branch contains all keywords (order-independent, case-insensitive)
-                const pattern = keywords.map(kw => `(?=.*${kw})`).join('');
-                return new RegExp(pattern, 'i');
+            // Use $or with individual regex patterns for each branch
+            const branchConditions = preferredBranches.map(branch => {
+                // Escape special regex characters and create case-insensitive pattern
+                const escapedBranch = branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                return { branch: new RegExp(escapedBranch, 'i') };
             });
 
-            query.branch = { $in: branchPatterns };
+            query.$or = branchConditions;
         }
 
         console.log('Prediction Query:', JSON.stringify(query, null, 2));
 
         // Find matching cutoffs
-        const cutoffs = await Cutoff.find(query)
-            .limit(100) // Reasonable limit
-            .lean();
+        let cutoffs;
+        try {
+            cutoffs = await Cutoff.find(query)
+                .limit(100) // Reasonable limit
+                .lean();
+            console.log(`Query executed successfully, found ${cutoffs.length} cutoffs`);
+        } catch (queryError) {
+            console.error('MongoDB query error:', queryError);
+            return res.status(500).json({
+                success: false,
+                message: 'Database query failed',
+                error: queryError.message
+            });
+        }
 
         console.log(`Found ${cutoffs.length} cutoffs matching criteria`);
 
@@ -218,11 +226,17 @@ router.post('/', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Prediction error:', error);
+        console.error('=== PREDICTION ERROR ===');
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        console.error('Request body:', JSON.stringify(req.body, null, 2));
+
         res.status(500).json({
             success: false,
             message: 'Server error during prediction',
-            error: error.message
+            error: error.message,
+            errorType: error.name
         });
     }
 });
