@@ -96,7 +96,7 @@ router.post('/', async (req, res) => {
 
         // Filter by cities if specified
         if (preferredCities && preferredCities.length > 0) {
-            collegeQuery.location = { $in: preferredCities };
+            collegeQuery.city = { $in: preferredCities };
         }
 
         // Filter by college status if specified
@@ -153,8 +153,8 @@ router.post('/', async (req, res) => {
                 college: {
                     _id: college._id,
                     name: college.name,
-                    instituteCode: college.instituteCode || college.code || 'N/A',
-                    location: college.location,
+                    instituteCode: college.code || 'N/A',
+                    location: college.city || college.state || 'N/A',
                     university: college.university,
                     status: college.collegeStatus,
                     fees: college.fees,
