@@ -36,6 +36,7 @@ app.use('/api/cutoffs', require('./routes/cutoffRoutes'));
 app.use('/api/banners', require('./routes/bannerRoutes'));
 app.use('/api/predict', require('./routes/predictionRoutes')); // Prediction endpoint
 app.use('/api/search-cutoffs', require('./routes/searchCutoffsRoutes')); // Search cutoffs for add dialog
+app.use('/api/feedback', require('./routes/feedbackRoutes')); // User feedback
 
 app.get('/', (req, res) => {
     res.send('GetCounsel API is running');

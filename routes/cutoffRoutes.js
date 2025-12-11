@@ -7,14 +7,73 @@ const College = require('../models/College');
 router.get('/meta/categories', (req, res) => {
     const { exam } = req.query;
 
-    // Pre-defined MHTCET Structure
+    // Pre-defined MHTCET Structure with COMPREHENSIVE Maharashtra CAP data
     if (exam === 'MHTCET') {
         return res.json({
             success: true,
             data: {
-                categories: ['OPEN', 'OBC', 'SC', 'ST', 'VJNT', 'NT1', 'NT2', 'NT3', 'EWS', 'TFWS', 'PWD'],
+                categories: [
+                    'OPEN', 'SC', 'ST', 'VJ', 'NT1', 'NT2', 'NT3', 'OBC', 'SEBC', 'EWS',
+                    'TFWS', 'PWD', 'DEF', 'ORPHAN', 'MINORITY',
+                    'OPEN-L', 'SC-L', 'ST-L', 'VJ-L', 'NT1-L', 'NT2-L', 'NT3-L',
+                    'OBC-L', 'SEBC-L', 'EWS-L', 'TFWS-L', 'PWD-L', 'DEF-L', 'ORPHAN-L', 'MINORITY-L'
+                ],
                 subCategories: ['General', 'Male', 'Female', 'Home State', 'Other State', 'Minority'],
-                seatTypes: ['AI', 'HS', 'OS', 'TFWS', 'DEF', 'PWD', 'GOI']
+                seatTypes: [
+                    'GOPENS', 'LOPENS',
+                    'GSC', 'LSC', 'GST', 'LST', 'GVJ', 'LVJ',
+                    'GNT1', 'LNT1', 'GNT2', 'LNT2', 'GNT3', 'LNT3',
+                    'GOBC', 'LOBC', 'GSEBC', 'LSEBC',
+                    'EWS', 'TFWS',
+                    'PWD', 'PWD-L',
+                    'DEF1', 'DEF2', 'DEF3',
+                    'MI', 'MINORITY',
+                    'HU', 'OHU', 'SL', 'AI'
+                ],
+                branches: [
+                    'Computer Engineering',
+                    'Computer Science and Engineering',
+                    'Information Technology',
+                    'Artificial Intelligence',
+                    'Artificial Intelligence and Machine Learning',
+                    'Artificial Intelligence and Data Science',
+                    'Data Science',
+                    'Computer Science & Business Systems',
+                    'CSE (IoT & Cyber Security including Blockchain)',
+                    'CSE (Cyber Security)',
+                    'CSE (IoT)',
+                    'CSE (Data Science)',
+                    'Electronics Engineering',
+                    'Electronics and Telecommunication Engineering',
+                    'Electronics and Computer Engineering',
+                    'Electronics & Instrumentation Engineering',
+                    'Electrical Engineering',
+                    'Mechanical Engineering',
+                    'Civil Engineering',
+                    'Mechatronics Engineering',
+                    'Production Engineering',
+                    'Manufacturing Engineering',
+                    'Automobile Engineering',
+                    'Industrial Engineering',
+                    'Chemical Engineering',
+                    'Biotechnology Engineering',
+                    'Biomedical Engineering',
+                    'Food Technology',
+                    'Pharmaceutical Chemistry',
+                    'Environmental Engineering',
+                    'Plastic and Polymer Engineering',
+                    'Petroleum Engineering',
+                    'Textile Engineering',
+                    'Agricultural Engineering',
+                    'Instrumentation Engineering',
+                    'Mining Engineering',
+                    'Robotics and Automation',
+                    'Aerospace Engineering',
+                    'Aeronautical Engineering',
+                    'Metallurgical Engineering',
+                    'Marine Engineering',
+                    'Other'
+                ]
             }
         });
     }
