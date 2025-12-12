@@ -344,22 +344,12 @@ router.post('/', async (req, res) => {
             collegeMap[college._id.toString()] = college;
         });
 
-        // Build predictions with all cutoff tabs
+        // Build predictions - each cutoff as separate item (not grouped)
         const predictions = [];
-        const collegeGroupMap = new Map(); // Group cutoffs by college
 
         cutoffs.forEach(cutoff => {
             const college = collegeMap[cutoff.collegeId.toString()];
             if (!college) return;
-
-            const collegeKey = college._id.toString();
-
-            if (!collegeGroupMap.has(collegeKey)) {
-                collegeGroupMap.set(collegeKey, {
-                    college,
-                    cutoffs: []
-                });
-            }
 
             // Calculate match score
             const percentileDiff = Math.abs(percentile - cutoff.percentile);
@@ -388,45 +378,34 @@ router.post('/', async (req, res) => {
                 matchReason = `Reach - Below cutoff (${diff.toFixed(1)}%)`;
             }
 
-            collegeGroupMap.get(collegeKey).cutoffs.push({
-                _id: cutoff._id,
-                branch: cutoff.branch,
-                percentile: cutoff.percentile,
-                openingRank: cutoff.openingRank,
-                closingRank: cutoff.closingRank,
-                year: cutoff.year,
-                round: cutoff.round,
-                category: cutoff.category,
-                seatType: cutoff.seatType,
-                matchScore: Math.round(matchScore),
-                matchReason
-            });
-        });
-
-        // Convert grouped data to predictions array
-        collegeGroupMap.forEach((data, collegeKey) => {
-            // Sort cutoffs by match score descending
-            data.cutoffs.sort((a, b) => b.matchScore - a.matchScore);
-
-            // Use the best match score for the college
-            const bestCutoff = data.cutoffs[0];
-
+            // Add each cutoff as a separate prediction
             predictions.push({
                 serialNumber: predictions.length + 1,
                 college: {
-                    _id: data.college._id,
-                    name: data.college.name,
-                    instituteCode: data.college.code || 'N/A',
-                    location: data.college.city || data.college.state || 'N/A',
-                    university: data.college.university,
-                    status: data.college.collegeStatus,
-                    fees: data.college.fees,
-                    rating: data.college.rating
+                    _id: college._id,
+                    name: college.name,
+                    instituteCode: college.code || 'N/A',
+                    location: college.city || college.state || 'N/A',
+                    university: college.university,
+                    status: college.collegeStatus,
+                    fees: college.fees,
+                    rating: college.rating
                 },
-                cutoff: bestCutoff, // Primary cutoff (best match)
-                allCutoffs: data.cutoffs, // All matching cutoffs for tabs
-                matchScore: bestCutoff.matchScore,
-                matchReason: bestCutoff.matchReason
+                cutoff: {
+                    _id: cutoff._id,
+                    branch: cutoff.branch,
+                    percentile: cutoff.percentile,
+                    openingRank: cutoff.openingRank,
+                    closingRank: cutoff.closingRank,
+                    year: cutoff.year,
+                    round: cutoff.round,
+                    category: cutoff.category,
+                    seatType: cutoff.seatType,
+                    matchScore: Math.round(matchScore),
+                    matchReason
+                },
+                matchScore: Math.round(matchScore),
+                matchReason
             });
         });
 
