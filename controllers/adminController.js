@@ -118,9 +118,15 @@ exports.updateCollege = async (req, res) => {
             updateData.courses = JSON.parse(updateData.courses);
         }
 
-        // Upload new images if provided
+        // Get existing college to append images
+        const existingCollege = await College.findById(req.params.id);
+        if (!existingCollege) {
+            return res.status(404).json({ success: false, message: 'College not found' });
+        }
+
+        // Upload new images if provided and append to existing
         if (req.files && req.files.length > 0) {
-            const imageUrls = [];
+            const newImageUrls = [];
             for (const file of req.files) {
                 const result = await cloudinary.uploader.upload(file.path, {
                     folder: 'colleges',
@@ -129,9 +135,11 @@ exports.updateCollege = async (req, res) => {
                         { quality: 'auto' }
                     ]
                 });
-                imageUrls.push(result.secure_url);
+                newImageUrls.push(result.secure_url);
             }
-            updateData.images = imageUrls;
+
+            // Append new images to existing images
+            updateData.images = [...(existingCollege.images || []), ...newImageUrls];
         }
 
         const college = await College.findByIdAndUpdate(
@@ -140,12 +148,9 @@ exports.updateCollege = async (req, res) => {
             { new: true, runValidators: true }
         );
 
-        if (!college) {
-            return res.status(404).json({ success: false, message: 'College not found' });
-        }
-
         res.json({ success: true, message: 'College updated', data: college });
     } catch (error) {
+        console.error('Update college error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
