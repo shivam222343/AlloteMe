@@ -352,30 +352,40 @@ router.post('/', async (req, res) => {
             if (!college) return;
 
             // Calculate match score
-            const percentileDiff = Math.abs(percentile - cutoff.percentile);
+            const diff = percentile - cutoff.percentile;
             let matchScore = 0;
 
-            if (percentileDiff === 0) {
-                matchScore = 100;
-            } else if (percentileDiff <= toleranceRange) {
-                matchScore = 100 - ((percentileDiff / toleranceRange) * 30);
-            } else if (percentileDiff <= toleranceRange * 2) {
-                matchScore = 70 - (((percentileDiff - toleranceRange) / toleranceRange) * 20);
+            // If user's percentile is higher than cutoff, they have excellent chances
+            if (diff >= 0) {
+                matchScore = 100; // User is above or at cutoff - excellent chance!
             } else {
-                matchScore = Math.max(0, 50 - (percentileDiff - (2 * toleranceRange)));
+                // User is below cutoff - calculate based on how far below
+                const percentileDiff = Math.abs(diff);
+
+                if (percentileDiff <= toleranceRange) {
+                    // Within tolerance - still good chances (70-99%)
+                    matchScore = 100 - ((percentileDiff / toleranceRange) * 30);
+                } else if (percentileDiff <= toleranceRange * 2) {
+                    // Beyond tolerance but within 2x - moderate chances (50-69%)
+                    matchScore = 70 - (((percentileDiff - toleranceRange) / toleranceRange) * 20);
+                } else {
+                    // Far below cutoff - low chances (0-49%)
+                    matchScore = Math.max(0, 50 - (percentileDiff - (2 * toleranceRange)));
+                }
             }
 
             // Generate match reason
-            const diff = percentile - cutoff.percentile;
             let matchReason;
             if (diff >= 5) {
-                matchReason = `Good Chance - Above cutoff by ${diff.toFixed(1)}%`;
+                matchReason = `Excellent - Above cutoff by ${diff.toFixed(1)}%`;
             } else if (diff >= 0) {
-                matchReason = `Possible - Near cutoff (+${diff.toFixed(1)}%)`;
+                matchReason = `Good Chance - At or above cutoff (+${diff.toFixed(1)}%)`;
             } else if (diff >= -5) {
-                matchReason = `Borderline - Slightly below cutoff (${diff.toFixed(1)}%)`;
+                matchReason = `Possible - Slightly below cutoff (${diff.toFixed(1)}%)`;
+            } else if (diff >= -10) {
+                matchReason = `Borderline - Below cutoff (${diff.toFixed(1)}%)`;
             } else {
-                matchReason = `Reach - Below cutoff (${diff.toFixed(1)}%)`;
+                matchReason = `Reach - Well below cutoff (${diff.toFixed(1)}%)`;
             }
 
             // Add each cutoff as a separate prediction
