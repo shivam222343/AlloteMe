@@ -207,8 +207,38 @@ function getMatchingSeatTypes(inputSeatType, fuzzyThreshold = 60) {
 }
 
 /**
+ * Normalize exam type to handle variants
+ * MHT-CET, MHTCET, MHT, CET → MHTCET
+ * JEE MAIN, JEE-MAIN, JEEMAIN → JEE
+ * NEET UG, NEET-UG → NEET
+ */
+function normalizeExamType(examType) {
+    if (!examType) return examType;
+
+    const normalized = examType.toUpperCase().replace(/[\s\-_]/g, '');
+
+    // MHT-CET variants
+    if (normalized.includes('MHT') || normalized.includes('CET')) {
+        return 'MHTCET';
+    }
+
+    // JEE variants
+    if (normalized.includes('JEE')) {
+        return 'JEE';
+    }
+
+    // NEET variants
+    if (normalized.includes('NEET')) {
+        return 'NEET';
+    }
+
+    return examType; // Return original if no match
+}
+
+/**
  * POST /api/predict
  * College prediction based on user input with fuzzy matching
+ * Supports both percentile-based (MHT-CET) and rank-based (JEE, NEET) predictions
  */
 router.post('/', async (req, res) => {
     try {
@@ -216,8 +246,9 @@ router.post('/', async (req, res) => {
         console.log('Request Body:', JSON.stringify(req.body, null, 2));
 
         const {
-            examType,
+            examType: rawExamType,
             percentile,
+            rank, // For JEE/NEET
             year,
             round,
             category,
@@ -229,11 +260,19 @@ router.post('/', async (req, res) => {
             fuzzyMatch = true // Enable fuzzy matching by default
         } = req.body;
 
+        // Normalize exam type (handle MHT-CET variants)
+        let examType = normalizeExamType(rawExamType);
+        console.log(`Normalized exam type: ${rawExamType} → ${examType}`);
+
+        // Determine if this is rank-based or percentile-based
+        const isRankBased = ['JEE', 'NEET'].includes(examType);
+        const inputValue = isRankBased ? rank : percentile;
+
         // Validation - check for null/undefined, not falsy (0 is valid!)
-        if (!examType || percentile == null || year == null || round == null || !category || !seatType) {
+        if (!examType || inputValue == null || year == null || round == null || !category || !seatType) {
             console.error('Validation failed - missing fields:', {
                 examType: !!examType,
-                percentile: percentile != null,
+                inputValue: inputValue != null,
                 year: year != null,
                 round: round != null,
                 category: !!category,
@@ -241,7 +280,7 @@ router.post('/', async (req, res) => {
             });
             return res.status(400).json({
                 success: false,
-                message: 'Missing required fields'
+                message: `Missing required fields. ${isRankBased ? 'Rank' : 'Percentile'} is required for ${examType}.`
             });
         }
 
@@ -257,6 +296,7 @@ router.post('/', async (req, res) => {
         console.log('Fuzzy matching enabled:', fuzzyMatch);
         console.log('Input category:', category, '→ Matching:', matchingCategories);
         console.log('Input seat type:', seatType, '→ Matching:', matchingSeatTypes);
+        console.log(`Prediction mode: ${isRankBased ? 'RANK-BASED' : 'PERCENTILE-BASED'}`);
 
         // Build MongoDB query with flexible matching
         const query = {
@@ -274,10 +314,28 @@ router.post('/', async (req, res) => {
             query.seatType = { $in: matchingSeatTypes };
         }
 
-        // Add percentile range filter
-        const minPercentile = percentile - toleranceRange;
-        const maxPercentile = percentile + toleranceRange;
-        query.percentile = { $gte: minPercentile, $lte: maxPercentile };
+        // Add rank or percentile range filter based on exam type
+        if (isRankBased) {
+            // For JEE/NEET: Use rank-based filtering
+            // Find colleges where closing rank is >= user's rank (lower rank number = better)
+            const minRank = Math.max(1, rank - (toleranceRange * 1000)); // Tolerance in thousands
+            const maxRank = rank + (toleranceRange * 1000);
+
+            // Query for closing rank (user's rank should be <= closing rank to get admission)
+            query.closingRank = {
+                $gte: minRank.toString(),
+                $lte: maxRank.toString()
+            };
+
+            console.log(`Rank range: ${minRank} - ${maxRank}`);
+        } else {
+            // For MHT-CET: Use percentile-based filtering
+            const minPercentile = inputValue - toleranceRange;
+            const maxPercentile = inputValue + toleranceRange;
+            query.percentile = { $gte: minPercentile, $lte: maxPercentile };
+
+            console.log(`Percentile range: ${minPercentile} - ${maxPercentile}`);
+        }
 
         // Optional filters with fuzzy branch matching
         if (preferredBranches && preferredBranches.length > 0) {
@@ -351,41 +409,85 @@ router.post('/', async (req, res) => {
             const college = collegeMap[cutoff.collegeId.toString()];
             if (!college) return;
 
-            // Calculate match score
-            const diff = percentile - cutoff.percentile;
+            // Calculate match score based on exam type
             let matchScore = 0;
+            let matchReason = '';
+            let diff = 0;
 
-            // If user's percentile is higher than cutoff, they have excellent chances
-            if (diff >= 0) {
-                matchScore = 100; // User is above or at cutoff - excellent chance!
-            } else {
-                // User is below cutoff - calculate based on how far below
-                const percentileDiff = Math.abs(diff);
+            if (isRankBased) {
+                // Rank-based scoring (JEE/NEET)
+                // Lower rank is better, so if user's rank < closing rank, they have good chances
+                const userRank = parseInt(rank);
+                const cutoffRank = parseInt(cutoff.closingRank);
+                diff = cutoffRank - userRank; // Positive = user has better rank
 
-                if (percentileDiff <= toleranceRange) {
-                    // Within tolerance - still good chances (70-99%)
-                    matchScore = 100 - ((percentileDiff / toleranceRange) * 30);
-                } else if (percentileDiff <= toleranceRange * 2) {
-                    // Beyond tolerance but within 2x - moderate chances (50-69%)
-                    matchScore = 70 - (((percentileDiff - toleranceRange) / toleranceRange) * 20);
+                if (diff >= 0) {
+                    // User's rank is better than or equal to cutoff - excellent chance!
+                    matchScore = 100;
                 } else {
-                    // Far below cutoff - low chances (0-49%)
-                    matchScore = Math.max(0, 50 - (percentileDiff - (2 * toleranceRange)));
-                }
-            }
+                    // User's rank is worse than cutoff
+                    const rankDiff = Math.abs(diff);
+                    const toleranceInRanks = toleranceRange * 1000;
 
-            // Generate match reason
-            let matchReason;
-            if (diff >= 5) {
-                matchReason = `Excellent - Above cutoff by ${diff.toFixed(1)}%`;
-            } else if (diff >= 0) {
-                matchReason = `Good Chance - At or above cutoff (+${diff.toFixed(1)}%)`;
-            } else if (diff >= -5) {
-                matchReason = `Possible - Slightly below cutoff (${diff.toFixed(1)}%)`;
-            } else if (diff >= -10) {
-                matchReason = `Borderline - Below cutoff (${diff.toFixed(1)}%)`;
+                    if (rankDiff <= toleranceInRanks) {
+                        // Within tolerance - still good chances (70-99%)
+                        matchScore = 100 - ((rankDiff / toleranceInRanks) * 30);
+                    } else if (rankDiff <= toleranceInRanks * 2) {
+                        // Beyond tolerance but within 2x - moderate chances (50-69%)
+                        matchScore = 70 - (((rankDiff - toleranceInRanks) / toleranceInRanks) * 20);
+                    } else {
+                        // Far from cutoff - low chances (0-49%)
+                        matchScore = Math.max(0, 50 - ((rankDiff - (2 * toleranceInRanks)) / 1000));
+                    }
+                }
+
+                // Generate match reason for rank-based
+                if (diff >= 5000) {
+                    matchReason = `Excellent - Your rank is ${Math.abs(diff)} better than cutoff`;
+                } else if (diff >= 0) {
+                    matchReason = `Good Chance - At or better than cutoff rank`;
+                } else if (diff >= -5000) {
+                    matchReason = `Possible - Rank ${Math.abs(diff)} below cutoff`;
+                } else if (diff >= -10000) {
+                    matchReason = `Borderline - Rank ${Math.abs(diff)} below cutoff`;
+                } else {
+                    matchReason = `Reach - Rank ${Math.abs(diff)} below cutoff`;
+                }
             } else {
-                matchReason = `Reach - Well below cutoff (${diff.toFixed(1)}%)`;
+                // Percentile-based scoring (MHT-CET)
+                diff = inputValue - cutoff.percentile;
+
+                // If user's percentile is higher than cutoff, they have excellent chances
+                if (diff >= 0) {
+                    matchScore = 100; // User is above or at cutoff - excellent chance!
+                } else {
+                    // User is below cutoff - calculate based on how far below
+                    const percentileDiff = Math.abs(diff);
+
+                    if (percentileDiff <= toleranceRange) {
+                        // Within tolerance - still good chances (70-99%)
+                        matchScore = 100 - ((percentileDiff / toleranceRange) * 30);
+                    } else if (percentileDiff <= toleranceRange * 2) {
+                        // Beyond tolerance but within 2x - moderate chances (50-69%)
+                        matchScore = 70 - (((percentileDiff - toleranceRange) / toleranceRange) * 20);
+                    } else {
+                        // Far below cutoff - low chances (0-49%)
+                        matchScore = Math.max(0, 50 - (percentileDiff - (2 * toleranceRange)));
+                    }
+                }
+
+                // Generate match reason for percentile-based
+                if (diff >= 5) {
+                    matchReason = `Excellent - Above cutoff by ${diff.toFixed(1)}%`;
+                } else if (diff >= 0) {
+                    matchReason = `Good Chance - At or above cutoff (+${diff.toFixed(1)}%)`;
+                } else if (diff >= -5) {
+                    matchReason = `Possible - Slightly below cutoff (${diff.toFixed(1)}%)`;
+                } else if (diff >= -10) {
+                    matchReason = `Borderline - Below cutoff (${diff.toFixed(1)}%)`;
+                } else {
+                    matchReason = `Reach - Well below cutoff (${diff.toFixed(1)}%)`;
+                }
             }
 
             // Add each cutoff as a separate prediction
