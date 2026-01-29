@@ -19,7 +19,9 @@ const collegeSchema = new mongoose.Schema({
     collegeStatus: { type: String, default: 'Autonomous' }, // Autonomous, Government, etc.
     status: { type: String, default: 'Active' }, // Active/Inactive
     isFeatured: { type: Boolean, default: false }, // Featured on Home Screen
-    mapLink: { type: String, default: '' } // Google Maps link
+    mapLink: { type: String, default: '' }, // Google Maps link
+    seatMatrixImage: { type: String, default: '' }, // Cloudinary URL for seat matrix
+    feeStructureImage: { type: String, default: '' } // Cloudinary URL for fee structure
 }, { timestamps: true });
 
 module.exports = mongoose.model('College', collegeSchema);

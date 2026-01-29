@@ -13,8 +13,16 @@ router.post('/register', adminController.register);
 // College routes
 router.get('/colleges', adminController.getAllColleges);
 router.get('/colleges/:id', adminController.getCollege);
-router.post('/colleges', upload.array('images', 5), adminController.addCollege);
-router.patch('/colleges/:id', upload.array('images', 5), adminController.updateCollege);
+router.post('/colleges', upload.fields([
+    { name: 'images', maxCount: 5 },
+    { name: 'seatMatrixImage', maxCount: 1 },
+    { name: 'feeStructureImage', maxCount: 1 }
+]), adminController.addCollege);
+router.patch('/colleges/:id', upload.fields([
+    { name: 'images', maxCount: 5 },
+    { name: 'seatMatrixImage', maxCount: 1 },
+    { name: 'feeStructureImage', maxCount: 1 }
+]), adminController.updateCollege);
 router.delete('/colleges/:id', adminController.deleteCollege);
 
 // Cutoff routes

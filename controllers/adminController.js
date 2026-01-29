@@ -54,27 +54,38 @@ exports.addCollege = async (req, res) => {
     try {
         const collegeData = { ...req.body };
 
-        // Parse courses if it's string
         if (typeof collegeData.courses === 'string') {
             collegeData.courses = JSON.parse(collegeData.courses);
         }
 
-        // Upload multiple images to Cloudinary
+        // Upload Gallery Images
         const imageUrls = [];
-        if (req.files && req.files.length > 0) {
-            for (const file of req.files) {
+        if (req.files && req.files.images) {
+            for (const file of req.files.images) {
                 const result = await cloudinary.uploader.upload(file.path, {
                     folder: 'colleges',
-                    transformation: [
-                        { width: 800, height: 600, crop: 'limit' },
-                        { quality: 'auto' }
-                    ]
+                    transformation: [{ width: 800, height: 600, crop: 'limit' }, { quality: 'auto' }]
                 });
                 imageUrls.push(result.secure_url);
             }
         }
-
         collegeData.images = imageUrls;
+
+        // Upload Seat Matrix Image
+        if (req.files && req.files.seatMatrixImage) {
+            const result = await cloudinary.uploader.upload(req.files.seatMatrixImage[0].path, {
+                folder: 'colleges/seat_matrix'
+            });
+            collegeData.seatMatrixImage = result.secure_url;
+        }
+
+        // Upload Fee Structure Image
+        if (req.files && req.files.feeStructureImage) {
+            const result = await cloudinary.uploader.upload(req.files.feeStructureImage[0].path, {
+                folder: 'colleges/fees'
+            });
+            collegeData.feeStructureImage = result.secure_url;
+        }
 
         const college = new College(collegeData);
         await college.save();
@@ -118,28 +129,38 @@ exports.updateCollege = async (req, res) => {
             updateData.courses = JSON.parse(updateData.courses);
         }
 
-        // Get existing college to append images
         const existingCollege = await College.findById(req.params.id);
         if (!existingCollege) {
             return res.status(404).json({ success: false, message: 'College not found' });
         }
 
-        // Upload new images if provided and append to existing
-        if (req.files && req.files.length > 0) {
+        // Handle Gallery Images
+        if (req.files && req.files.images) {
             const newImageUrls = [];
-            for (const file of req.files) {
+            for (const file of req.files.images) {
                 const result = await cloudinary.uploader.upload(file.path, {
                     folder: 'colleges',
-                    transformation: [
-                        { width: 800, height: 600, crop: 'limit' },
-                        { quality: 'auto' }
-                    ]
+                    transformation: [{ width: 800, height: 600, crop: 'limit' }, { quality: 'auto' }]
                 });
                 newImageUrls.push(result.secure_url);
             }
-
-            // Append new images to existing images
             updateData.images = [...(existingCollege.images || []), ...newImageUrls];
+        }
+
+        // Handle Seat Matrix
+        if (req.files && req.files.seatMatrixImage) {
+            const result = await cloudinary.uploader.upload(req.files.seatMatrixImage[0].path, {
+                folder: 'colleges/seat_matrix'
+            });
+            updateData.seatMatrixImage = result.secure_url;
+        }
+
+        // Handle Fee Structure
+        if (req.files && req.files.feeStructureImage) {
+            const result = await cloudinary.uploader.upload(req.files.feeStructureImage[0].path, {
+                folder: 'colleges/fees'
+            });
+            updateData.feeStructureImage = result.secure_url;
         }
 
         const college = await College.findByIdAndUpdate(
