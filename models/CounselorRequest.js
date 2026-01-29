@@ -30,6 +30,28 @@ const CounselorRequestSchema = new mongoose.Schema({
         enum: ['Pending', 'Contacted', 'In-Progress', 'Completed'],
         default: 'Pending'
     },
+    documentUrl: {
+        type: String, // URL to uploaded document (PDF, etc.)
+        default: null
+    },
+    rating: {
+        type: Number,
+        min: 1,
+        max: 5,
+        default: null
+    },
+    feedback: {
+        type: String,
+        default: null
+    },
+    completedAt: {
+        type: Date,
+        default: null
+    },
+    notes: {
+        type: String, // Counselor's notes about the student
+        default: null
+    },
     requestedAt: {
         type: Date,
         default: Date.now

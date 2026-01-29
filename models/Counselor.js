@@ -28,9 +28,35 @@ const CounselorSchema = new mongoose.Schema({
         type: String, // e.g., "Starting from ₹500"
         default: "Paid Support"
     },
-    rating: {
+    profileImage: {
+        type: String, // URL to profile image
+        default: null
+    },
+    bio: {
+        type: String,
+        default: "Experienced counselor helping students achieve their dreams"
+    },
+    experience: {
+        type: String, // e.g., "5+ years"
+        default: "3+ years"
+    },
+    qualification: {
+        type: String, // e.g., "M.Ed, Career Counseling"
+        default: "Certified Career Counselor"
+    },
+    totalRatings: {
         type: Number,
-        default: 4.5
+        default: 0
+    },
+    averageRating: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 5
+    },
+    totalStudentsCounseled: {
+        type: Number,
+        default: 0
     },
     createdAt: {
         type: Date,
