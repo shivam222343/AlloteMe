@@ -3,6 +3,48 @@ const router = express.Router();
 const Counselor = require('../models/Counselor');
 const CounselorRequest = require('../models/CounselorRequest');
 const crypto = require('crypto');
+const multer = require('multer');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
+
+// Cloudinary config
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'counselors',
+        allowed_formats: ['jpg', 'png', 'jpeg']
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// Document Storage for Student Requests
+const docStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'counselor_docs',
+        allowed_formats: ['pdf', 'jpg', 'png', 'jpeg']
+    }
+});
+const uploadDoc = multer({ storage: docStorage });
+
+// Upload student document (used by mobile app)
+router.post('/upload-document', uploadDoc.single('document'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No document uploaded' });
+        }
+        res.json({ success: true, documentUrl: req.file.path });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
 
 // --- USER ROUTES ---
 
@@ -114,10 +156,22 @@ router.delete('/request/:id', async (req, res) => {
 // Find counselor for a region
 router.get('/find', async (req, res) => {
     try {
-        const { region } = req.query;
-        // Find a counselor who matches the region, or any available counselor if no match
-        let counselor = await Counselor.findOne({ regions: { $in: [region] }, isAvailable: true });
+        let { region } = req.query;
+        if (!region || region === 'All Regions') {
+            const counselor = await Counselor.findOne({ isAvailable: true });
+            return res.json({ success: true, counselor });
+        }
 
+        // Clean region name (e.g. "Mumbai Region" -> "Mumbai")
+        const baseRegion = region.replace(' Region', '').trim();
+
+        // Find a counselor who matches the region using regex for fuzzy matching
+        let counselor = await Counselor.findOne({
+            regions: { $elemMatch: { $regex: new RegExp(baseRegion, 'i') } },
+            isAvailable: true
+        });
+
+        // Fallback to any available counselor
         if (!counselor) {
             counselor = await Counselor.findOne({ isAvailable: true });
         }
@@ -164,21 +218,34 @@ router.put('/profile/:id', async (req, res) => {
     }
 });
 
-// Upload profile image (placeholder - requires multer setup)
-router.post('/profile-image/:id', async (req, res) => {
+// Upload profile image using multer
+router.post('/profile-image/:id', (req, res, next) => {
+    upload.single('profileImage')(req, res, (err) => {
+        if (err) {
+            console.error('Multer/Cloudinary Error:', err);
+            return res.status(500).json({ success: false, message: 'Upload failed: ' + err.message });
+        }
+        next();
+    });
+}, async (req, res) => {
     try {
-        // This is a placeholder. In production, use multer + cloudinary
-        // For now, we'll accept a URL
-        const { profileImage } = req.body;
+        console.log('Upload Request Received for:', req.params.id);
+        if (!req.file) {
+            console.warn('No file in request');
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+
+        console.log('File uploaded successfully:', req.file.path);
 
         const counselor = await Counselor.findByIdAndUpdate(
             req.params.id,
-            { profileImage },
+            { profileImage: req.file.path },
             { new: true }
         );
 
         res.json({ success: true, counselor });
     } catch (err) {
+        console.error('Database Update Error:', err);
         res.status(500).json({ success: false, message: err.message });
     }
 });

@@ -27,6 +27,11 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/getcounse
     .then(() => console.log('MongoDB Connected'))
     .catch(err => console.error('MongoDB Connection Error:', err));
 
+// Cloudinary Health Check
+const cloudinary = require('cloudinary').v2;
+const cloudConfigured = process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET;
+console.log(`Cloudinary System: ${cloudConfigured ? 'CONNECTED' : 'UNCONFIGURED (Images will fail)'}`);
+
 // Routes
 app.use('/api/admin', adminRoutes);
 app.use('/api/user', userRoutes);
