@@ -386,9 +386,13 @@ router.post('/', async (req, res) => {
             collegeQuery.city = { $in: preferredCities };
         }
 
-        // Filter by college status if specified
+        // Filter by college status if specified - Partial/Fuzzy match
         if (collegeStatuses && collegeStatuses.length > 0) {
-            collegeQuery.collegeStatus = { $in: collegeStatuses };
+            const statusConditions = collegeStatuses.map(status => {
+                const escapedStatus = status.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                return { collegeStatus: new RegExp(escapedStatus, 'i') };
+            });
+            collegeQuery.$or = statusConditions;
         }
 
         // Fetch colleges
@@ -465,14 +469,18 @@ router.post('/', async (req, res) => {
                     const percentileDiff = Math.abs(diff);
 
                     if (percentileDiff <= toleranceRange) {
-                        // Within tolerance - still good chances (70-99%)
+                        // Within tolerance - good chances (70-99%)
                         matchScore = 100 - ((percentileDiff / toleranceRange) * 30);
                     } else if (percentileDiff <= toleranceRange * 2) {
-                        // Beyond tolerance but within 2x - moderate chances (50-69%)
-                        matchScore = 70 - (((percentileDiff - toleranceRange) / toleranceRange) * 20);
+                        // Beyond tolerance but within 2x - moderate/low chances (20-69%)
+                        // More aggressive drop here
+                        matchScore = 70 - (((percentileDiff - toleranceRange) / toleranceRange) * 50);
+                    } else if (percentileDiff <= toleranceRange * 3) {
+                        // Within 3x - very low chance (1-19%)
+                        matchScore = 20 - (((percentileDiff - (2 * toleranceRange)) / toleranceRange) * 19);
                     } else {
-                        // Far below cutoff - low chances (0-49%)
-                        matchScore = Math.max(0, 50 - (percentileDiff - (2 * toleranceRange)));
+                        // Far below cutoff - nearly zero chance
+                        matchScore = 0;
                     }
                 }
 
