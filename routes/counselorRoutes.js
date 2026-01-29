@@ -99,6 +99,16 @@ router.patch('/request/:id', async (req, res) => {
     }
 });
 
+// Delete student request
+router.delete('/request/:id', async (req, res) => {
+    try {
+        await CounselorRequest.findByIdAndDelete(req.params.id);
+        res.json({ success: true, message: 'Request deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // --- STUDENT FLOW ---
 
 // Find counselor for a region
