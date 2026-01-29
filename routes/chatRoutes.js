@@ -48,24 +48,26 @@ router.post('/', async (req, res) => {
                 .slice(0, 5);
         }
 
-        let context = `You are a STRICT AI Admission Counselor for Maharashtra Engineering and Pharmacy admissions.
+        let context = `You are a professional AI Admission Counselor for Maharashtra Engineering and Pharmacy admissions.
         
         CRITICAL RULES:
-        1. Base your answer ONLY on the provided context. 
-        2. If the answer is NOT found in the context below, state: "I'm sorry, I don't have this specific information in my database at the moment."
-        3. DO NOT speculate or use general knowledge for cutoffs, fees, or dates.
-        4. Be concise and professional.
-        5. Use ### for headers and **Bold** for values.`;
+        1. Provide direct and helpful answers based ONLY on the provided information. 
+        2. If the answer is NOT available, state: "I'm sorry, I don't have this specific information as per my information at the moment."
+        3. DO NOT use technical words like "database", "context", "context below", or "training data" in your final response to the user.
+        4. Use respectful and guiding phrases like "As per my information..." or "Based on current admission records...".
+        5. DO NOT speculate on cutoffs, fees, or dates.
+        6. Be concise and professional.
+        7. Use ### for headers and **Bold** for values.`;
 
         if (relevantKnowledge.length > 0) {
-            context += "\n\nDATABASE - TRAINING DATA:\n";
+            context += "\n\nVERIFIED INFORMATION:\n";
             relevantKnowledge.forEach(k => {
                 context += `- Fact: ${k.answer}\n`;
             });
         }
 
         if (mentionedColleges.length > 0) {
-            context += "\n\nDATABASE - COLLEGE & CUTOFF DATA:\n";
+            context += "\n\nCOLLEGE & CUTOFF RECORDS:\n";
             for (const col of mentionedColleges) {
                 const cutoffs = await Cutoff.find({ collegeId: col._id }).sort({ year: -1 }).limit(10).lean();
                 context += `- **${col.name}** (${col.code}): Location: ${col.city}. Fees: ₹${col.fees}. Rating: ${col.rating}/5. Status: ${col.collegeStatus}.\n`;
