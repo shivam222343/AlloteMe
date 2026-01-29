@@ -38,6 +38,7 @@ app.use('/api/predict', require('./routes/predictionRoutes')); // Prediction end
 app.use('/api/search-cutoffs', require('./routes/searchCutoffsRoutes')); // Search cutoffs for add dialog
 app.use('/api/feedback', require('./routes/feedbackRoutes')); // User feedback
 app.use('/api/chat', require('./routes/chatRoutes')); // AI Counselor
+app.use('/api/ai-knowledge', require('./routes/aiKnowledgeRoutes')); // AI Training Data
 
 app.get('/', (req, res) => {
     res.send('GetCounsel API is running');

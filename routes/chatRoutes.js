@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const College = require('../models/College');
 const Cutoff = require('../models/Cutoff');
+const AIKnowledge = require('../models/AIKnowledge');
 const axios = require('axios');
 
 // AI Counselor Chat with Context
@@ -16,14 +17,28 @@ router.post('/', async (req, res) => {
         console.log('AI Chat Request:', message);
 
         // 1. Search for relevant context in the database
-        // We'll search for college names or branch names mentioned in the message
         const colleges = await College.find({}).lean();
+        const knowledgeBase = await AIKnowledge.find({}).lean();
+
+        // Search Knowledge Base for similar questions
+        const relevantKnowledge = knowledgeBase.filter(k =>
+            message.toLowerCase().includes(k.question.toLowerCase()) ||
+            k.tags.some(tag => message.toLowerCase().includes(tag.toLowerCase()))
+        ).slice(0, 5);
+
         const mentionedColleges = colleges.filter(c =>
             message.toLowerCase().includes(c.name.toLowerCase()) ||
             (c.code && message.includes(c.code))
         ).slice(0, 3);
 
         let context = "You are an expert college counselor for Maharashtra admissions (MHT-CET, JEE). ";
+
+        if (relevantKnowledge.length > 0) {
+            context += "\nHere is some specific knowledge for this query:\n";
+            relevantKnowledge.forEach(k => {
+                context += `- Q: ${k.question}\n  A: ${k.answer}\n`;
+            });
+        }
 
         if (mentionedColleges.length > 0) {
             context += "\nHere is information about the colleges mentioned/relevant:\n";
