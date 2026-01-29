@@ -40,6 +40,7 @@ app.use('/api/feedback', require('./routes/feedbackRoutes')); // User feedback
 app.use('/api/chat', require('./routes/chatRoutes')); // AI Counselor
 app.use('/api/ai-knowledge', require('./routes/aiKnowledgeRoutes')); // AI Training Data
 app.use('/api/prebuilt-queries', require('./routes/prebuiltQueryRoutes')); // Suggesion Chips
+app.use('/api/counselors', require('./routes/counselorRoutes')); // Counselor Connect
 
 app.get('/', (req, res) => {
     res.send('GetCounsel API is running');
