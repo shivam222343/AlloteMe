@@ -20,16 +20,25 @@ router.post('/', async (req, res) => {
         const colleges = await College.find({}).lean();
         const knowledgeBase = await AIKnowledge.find({}).lean();
 
-        // Search Knowledge Base for similar questions
-        const relevantKnowledge = knowledgeBase.filter(k =>
-            message.toLowerCase().includes(k.question.toLowerCase()) ||
-            k.tags.some(tag => message.toLowerCase().includes(tag.toLowerCase()))
-        ).slice(0, 5);
+        // Improved Search Logic: Look for keyword overlaps
+        const userMessageLower = message.toLowerCase();
 
-        const mentionedColleges = colleges.filter(c =>
-            message.toLowerCase().includes(c.name.toLowerCase()) ||
-            (c.code && message.includes(c.code))
-        ).slice(0, 3);
+        // Search Knowledge Base for similar questions or matching tags
+        const relevantKnowledge = knowledgeBase.filter(k => {
+            const questionMatch = k.question.toLowerCase().split(' ').some(word =>
+                word.length > 3 && userMessageLower.includes(word)
+            );
+            const tagMatch = k.tags.some(tag => userMessageLower.includes(tag.toLowerCase()));
+            return questionMatch || tagMatch || userMessageLower.includes(k.question.toLowerCase());
+        }).slice(0, 5);
+
+        // Search for mentioned colleges (by Name or Code)
+        const mentionedColleges = colleges.filter(c => {
+            const nameMatch = userMessageLower.includes(c.name.toLowerCase());
+            const codeMatch = c.code && message.includes(c.code.toString());
+            const shortNameMatch = c.name.length > 3 && userMessageLower.includes(c.name.toLowerCase().substring(0, 4));
+            return nameMatch || codeMatch || shortNameMatch;
+        }).slice(0, 3);
 
         let context = "You are an expert college counselor for Maharashtra admissions (MHT-CET, JEE). ";
 
