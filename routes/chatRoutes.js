@@ -33,44 +33,50 @@ router.post('/', async (req, res) => {
         }).slice(0, 5);
 
         // Search for mentioned colleges (by Name or Code)
-        const mentionedColleges = colleges.filter(c => {
+        let mentionedColleges = colleges.filter(c => {
             const nameMatch = userMessageLower.includes(c.name.toLowerCase());
             const codeMatch = c.code && message.includes(c.code.toString());
             const shortNameMatch = c.name.length > 3 && userMessageLower.includes(c.name.toLowerCase().substring(0, 4));
             return nameMatch || codeMatch || shortNameMatch;
         }).slice(0, 3);
 
-        let context = "You are an expert college counselor for Maharashtra admissions (MHT-CET, JEE). ";
+        // If user asks for "top" or "best" and no specific colleges found, pick top 5 from DB
+        if (mentionedColleges.length === 0 && (userMessageLower.includes('top') || userMessageLower.includes('best'))) {
+            mentionedColleges = colleges
+                .filter(c => c.rating)
+                .sort((a, b) => b.rating - a.rating)
+                .slice(0, 5);
+        }
+
+        let context = `You are a STRICT AI Admission Counselor for Maharashtra Engineering and Pharmacy admissions.
+        
+        CRITICAL RULES:
+        1. Base your answer ONLY on the provided context. 
+        2. If the answer is NOT found in the context below, state: "I'm sorry, I don't have this specific information in my database at the moment."
+        3. DO NOT speculate or use general knowledge for cutoffs, fees, or dates.
+        4. Be concise and professional.
+        5. Use ### for headers and **Bold** for values.`;
 
         if (relevantKnowledge.length > 0) {
-            context += "\nHere is some specific knowledge for this query:\n";
+            context += "\n\nDATABASE - TRAINING DATA:\n";
             relevantKnowledge.forEach(k => {
-                context += `- Q: ${k.question}\n  A: ${k.answer}\n`;
+                context += `- Fact: ${k.answer}\n`;
             });
         }
 
         if (mentionedColleges.length > 0) {
-            context += "\nHere is information about the colleges mentioned/relevant:\n";
+            context += "\n\nDATABASE - COLLEGE & CUTOFF DATA:\n";
             for (const col of mentionedColleges) {
                 const cutoffs = await Cutoff.find({ collegeId: col._id }).sort({ year: -1 }).limit(10).lean();
-                context += `- **${col.name}** (Code: ${col.code || 'N/A'}): Located in ${col.city}, ${col.state}. Status: ${col.collegeStatus}. University: ${col.university}. Rating: ${col.rating}/5. Fees: ₹${col.fees}.\n`;
+                context += `- **${col.name}** (${col.code}): Location: ${col.city}. Fees: ₹${col.fees}. Rating: ${col.rating}/5. Status: ${col.collegeStatus}.\n`;
                 if (cutoffs.length > 0) {
-                    context += `  Latest Cutoffs:\n`;
+                    context += `  Verified Cutoffs:\n`;
                     cutoffs.forEach(cut => {
-                        context += `  - ${cut.year} Round ${cut.round}: ${cut.branch} (${cut.category}) -> Closing Rank: ${cut.closingRank}, Percentile: ${cut.percentile}%\n`;
+                        context += `  - ${cut.year} Round ${cut.round}: ${cut.branch} (${cut.category}) -> Rank ${cut.closingRank}, ${cut.percentile}%\n`;
                     });
                 }
             }
-        } else if (message.toLowerCase().includes('top') || message.toLowerCase().includes('best')) {
-            // Provide some top colleges as context
-            const topColleges = colleges.sort((a, b) => b.rating - a.rating).slice(0, 5);
-            context += "\nHere are some top rated colleges:\n";
-            topColleges.forEach(col => {
-                context += `- ${col.name} (${col.city}): Rating ${col.rating}/5, Fees ₹${col.fees}\n`;
-            });
         }
-
-        context += "\n\nIMPORTANT RULES:\n1. Use the provided context to answer accurately.\n2. If you don't know something, say you don't have that specific data.\n3. Keep it professional and helpful.\n4. Format: Use ### for headers and **Bold** for values.";
 
         // 2. Call Groq API (or any LLM)
         const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
