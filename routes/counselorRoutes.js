@@ -29,7 +29,7 @@ const docStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
         folder: 'counselor_docs',
-        allowed_formats: ['pdf', 'jpg', 'png', 'jpeg']
+        resource_type: 'auto'
     }
 });
 const uploadDoc = multer({ storage: docStorage });
@@ -38,10 +38,14 @@ const uploadDoc = multer({ storage: docStorage });
 router.post('/upload-document', uploadDoc.single('document'), async (req, res) => {
     try {
         if (!req.file) {
+            console.warn('Document Upload: No file received');
             return res.status(400).json({ success: false, message: 'No document uploaded' });
         }
+
+        console.log(`Document Uploaded: ${req.file.path} (Original: ${req.file.originalname})`);
         res.json({ success: true, documentUrl: req.file.path });
     } catch (err) {
+        console.error('Document Upload Error:', err);
         res.status(500).json({ success: false, message: err.message });
     }
 });
@@ -153,30 +157,30 @@ router.delete('/request/:id', async (req, res) => {
 
 // --- STUDENT FLOW ---
 
-// Find counselor for a region
+// Find counselors for a region
 router.get('/find', async (req, res) => {
     try {
         let { region } = req.query;
         if (!region || region === 'All Regions') {
-            const counselor = await Counselor.findOne({ isAvailable: true });
-            return res.json({ success: true, counselor });
+            const counselors = await Counselor.find({ isAvailable: true });
+            return res.json({ success: true, counselors });
         }
 
         // Clean region name (e.g. "Mumbai Region" -> "Mumbai")
         const baseRegion = region.replace(' Region', '').trim();
 
-        // Find a counselor who matches the region using regex for fuzzy matching
-        let counselor = await Counselor.findOne({
+        // Find counselors who match the region using regex for fuzzy matching
+        let counselors = await Counselor.find({
             regions: { $elemMatch: { $regex: new RegExp(baseRegion, 'i') } },
             isAvailable: true
         });
 
-        // Fallback to any available counselor
-        if (!counselor) {
-            counselor = await Counselor.findOne({ isAvailable: true });
+        // Fallback to any available counselor if none found in region
+        if (counselors.length === 0) {
+            counselors = await Counselor.find({ isAvailable: true });
         }
 
-        res.json({ success: true, counselor });
+        res.json({ success: true, counselors });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
