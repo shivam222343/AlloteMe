@@ -8,13 +8,13 @@ const axios = require('axios');
 // AI Counselor Chat with Context
 router.post('/', async (req, res) => {
     try {
-        const { message, history } = req.body;
+        const { message, history, lang } = req.body;
 
         if (!message) {
             return res.status(400).json({ success: false, message: 'Message is required' });
         }
 
-        console.log('AI Chat Request:', message);
+        console.log('AI Chat Request:', message, 'Language:', lang);
 
         // 1. Search for relevant context in the database
         const colleges = await College.find({}).lean();
@@ -58,6 +58,10 @@ router.post('/', async (req, res) => {
         5. DO NOT speculate on cutoffs, fees, or dates.
         6. Be concise and professional.
         7. Use ### for headers and **Bold** for values.`;
+
+        if (lang && lang !== 'English') {
+            context += `\n\nRESPONSE LANGUAGE: Please respond in ${lang}. This is very important. All descriptions and guidance must be in ${lang}.`;
+        }
 
         if (relevantKnowledge.length > 0) {
             context += "\n\nVERIFIED INFORMATION:\n";
