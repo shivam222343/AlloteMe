@@ -349,7 +349,7 @@ router.get('/admin/stats/overview', async (req, res) => {
 // Get nearby counselors based on user location
 router.get('/nearby', async (req, res) => {
     try {
-        const { lat, lng, maxDistance = 50 } = req.query; // maxDistance in km, default 50km
+        const { lat, lng, maxDistance = 100 } = req.query; // Increased default to 100km
 
         if (!lat || !lng) {
             return res.status(400).json({
@@ -360,31 +360,41 @@ router.get('/nearby', async (req, res) => {
 
         const latitude = parseFloat(lat);
         const longitude = parseFloat(lng);
-        const maxDistanceMeters = parseFloat(maxDistance) * 1000; // Convert km to meters
+        const maxDistanceMeters = parseFloat(maxDistance) * 1000;
 
-        // Find counselors near the location using MongoDB geospatial query
-        const counselors = await Counselor.find({
-            locationEnabled: true,
-            isAvailable: true,
-            'location.coordinates': { $ne: null },
-            location: {
-                $near: {
-                    $geometry: {
-                        type: 'Point',
-                        coordinates: [longitude, latitude] // [lng, lat] format for GeoJSON
-                    },
-                    $maxDistance: maxDistanceMeters
+        // Try geospatial query first
+        let counselors = [];
+        try {
+            counselors = await Counselor.find({
+                locationEnabled: true,
+                isAvailable: true,
+                'location.coordinates': { $ne: null, $size: 2 },
+                location: {
+                    $near: {
+                        $geometry: {
+                            type: 'Point',
+                            coordinates: [longitude, latitude]
+                        },
+                        $maxDistance: maxDistanceMeters
+                    }
                 }
-            }
-        }).limit(50); // Limit to 50 nearest counselors
+            }).limit(50);
+        } catch (geoError) {
+            console.warn('Geospatial query failed, falling back to manual: ', geoError.message);
+            // Fallback: Find all counselors with location and calculate manually
+            counselors = await Counselor.find({
+                locationEnabled: true,
+                isAvailable: true,
+                'location.coordinates': { $ne: null, $size: 2 }
+            }).limit(100);
+        }
 
-        // Calculate distance for each counselor
+        // Calculate distance and filter/sort
+        const R = 6371; // Earth's radius in km
         const counselorsWithDistance = counselors.map(counselor => {
             const counselorLng = counselor.location.coordinates[0];
             const counselorLat = counselor.location.coordinates[1];
 
-            // Haversine formula to calculate distance
-            const R = 6371; // Earth's radius in km
             const dLat = (counselorLat - latitude) * Math.PI / 180;
             const dLng = (counselorLng - longitude) * Math.PI / 180;
             const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -395,14 +405,20 @@ router.get('/nearby', async (req, res) => {
 
             return {
                 ...counselor.toObject(),
-                distance: parseFloat(distance.toFixed(2)) // Distance in km
+                distance: parseFloat(distance.toFixed(2))
             };
         });
 
+        // If geospatial query failed, we need to sort manually
+        counselorsWithDistance.sort((a, b) => a.distance - b.distance);
+
+        // Filter results within range if it was a fallback
+        const filteredResults = counselorsWithDistance.filter(c => c.distance <= parseFloat(maxDistance));
+
         res.json({
             success: true,
-            counselors: counselorsWithDistance,
-            count: counselorsWithDistance.length
+            counselors: filteredResults.length > 0 ? filteredResults : counselorsWithDistance.slice(0, 5), // Return at least 5 nearest if none in range
+            count: filteredResults.length
         });
     } catch (err) {
         console.error('Nearby counselors error:', err);

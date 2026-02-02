@@ -8,7 +8,7 @@ const axios = require('axios');
 // AI Counselor Chat with Context
 router.post('/', async (req, res) => {
     try {
-        const { message, history, lang } = req.body;
+        const { message, history, lang, userInfo } = req.body;
 
         if (!message) {
             return res.status(400).json({ success: false, message: 'Message is required' });
@@ -51,13 +51,18 @@ router.post('/', async (req, res) => {
         let context = `You are a professional AI Admission Counselor for Maharashtra Engineering and Pharmacy admissions.
         
         CRITICAL RULES:
-        1. Provide direct and helpful answers based ONLY on the provided information. 
-        2. If the answer is NOT available, state: "I'm sorry, I don't have this specific information as per my information at the moment."
-        3. DO NOT use technical words like "database", "context", "context below", or "training data" in your final response to the user.
-        4. Use respectful and guiding phrases like "As per my information..." or "Based on current admission records...".
+        1. Provide direct and helpful answers based on your training and verified data. 
+        2. If the answer is NOT available, state: "I'm sorry, I don't have this specific information as per my knowledge at the moment."
+        3. DO NOT use technical words like "database", "context", "context below", "training data", or "mongodb" in your final response.
+        4. Use respectful and guiding phrases like "As per my knowledge..." or "Based on current admission records...".
         5. DO NOT speculate on cutoffs, fees, or dates.
         6. Be concise and professional.
         7. Use ### for headers and **Bold** for values.`;
+
+        if (userInfo) {
+            context += `\n\nUSER PROFILE:\n- CET Percentile: ${userInfo.percentile || 'Not mentioned'}\n- Region: ${userInfo.region || 'Not mentioned'}\n- Interest: ${userInfo.interest || 'Not mentioned'}\n- Name: ${userInfo.name || 'Guest'}`;
+            context += `\nAlways keep the user's specific context in mind. For example, if they have ${userInfo.percentile} percentile, suggest colleges where they have a realistic chance.`;
+        }
 
         if (lang && lang !== 'English') {
             context += `\n\nRESPONSE LANGUAGE: Please respond in ${lang}. This is very important. All descriptions and guidance must be in ${lang}.`;
@@ -96,7 +101,7 @@ router.post('/', async (req, res) => {
             max_tokens: 1024
         }, {
             headers: {
-                'Authorization': `Bearer ${process.env.GROQ_API_KEY || 'gsk_xWbWpGshkU2N8y6R6R6R6R6R6R6R6R6R6R6R6R6R6R6R6R6R6R6R'}`, // Placeholder if not in env
+                'Authorization': `Bearer ${process.env.GROQ_API_KEY || 'gsk_xWbWpGshkU2N8y6R6R6R6R6R6R6R6R6R6R6R6R6R6R6R6R6R6R6R'}`,
                 'Content-Type': 'application/json'
             }
         });
