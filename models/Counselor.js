@@ -58,10 +58,45 @@ const CounselorSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    // Location fields for nearby counselors feature
+    address: {
+        type: String,
+        default: null
+    },
+    city: {
+        type: String,
+        default: null
+    },
+    state: {
+        type: String,
+        default: null
+    },
+    pincode: {
+        type: String,
+        default: null
+    },
+    location: {
+        type: {
+            type: String,
+            enum: ['Point'],
+            default: 'Point'
+        },
+        coordinates: {
+            type: [Number], // [longitude, latitude]
+            default: null
+        }
+    },
+    locationEnabled: {
+        type: Boolean,
+        default: false // Counselors must explicitly enable location sharing
+    },
     createdAt: {
         type: Date,
         default: Date.now
     }
 });
+
+// Create geospatial index for location-based queries
+CounselorSchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model('Counselor', CounselorSchema);

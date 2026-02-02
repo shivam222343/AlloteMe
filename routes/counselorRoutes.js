@@ -344,4 +344,128 @@ router.get('/admin/stats/overview', async (req, res) => {
     }
 });
 
+// --- NEARBY COUNSELORS ROUTES ---
+
+// Get nearby counselors based on user location
+router.get('/nearby', async (req, res) => {
+    try {
+        const { lat, lng, maxDistance = 50 } = req.query; // maxDistance in km, default 50km
+
+        if (!lat || !lng) {
+            return res.status(400).json({
+                success: false,
+                message: 'Latitude and longitude are required'
+            });
+        }
+
+        const latitude = parseFloat(lat);
+        const longitude = parseFloat(lng);
+        const maxDistanceMeters = parseFloat(maxDistance) * 1000; // Convert km to meters
+
+        // Find counselors near the location using MongoDB geospatial query
+        const counselors = await Counselor.find({
+            locationEnabled: true,
+            isAvailable: true,
+            'location.coordinates': { $ne: null },
+            location: {
+                $near: {
+                    $geometry: {
+                        type: 'Point',
+                        coordinates: [longitude, latitude] // [lng, lat] format for GeoJSON
+                    },
+                    $maxDistance: maxDistanceMeters
+                }
+            }
+        }).limit(50); // Limit to 50 nearest counselors
+
+        // Calculate distance for each counselor
+        const counselorsWithDistance = counselors.map(counselor => {
+            const counselorLng = counselor.location.coordinates[0];
+            const counselorLat = counselor.location.coordinates[1];
+
+            // Haversine formula to calculate distance
+            const R = 6371; // Earth's radius in km
+            const dLat = (counselorLat - latitude) * Math.PI / 180;
+            const dLng = (counselorLng - longitude) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(latitude * Math.PI / 180) * Math.cos(counselorLat * Math.PI / 180) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+
+            return {
+                ...counselor.toObject(),
+                distance: parseFloat(distance.toFixed(2)) // Distance in km
+            };
+        });
+
+        res.json({
+            success: true,
+            counselors: counselorsWithDistance,
+            count: counselorsWithDistance.length
+        });
+    } catch (err) {
+        console.error('Nearby counselors error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Get all counselors with location enabled (for map display)
+router.get('/map-data', async (req, res) => {
+    try {
+        const counselors = await Counselor.find({
+            locationEnabled: true,
+            isAvailable: true,
+            'location.coordinates': { $ne: null }
+        }).select('name profileImage averageRating totalRatings charges address city state location phone regions expertise');
+
+        res.json({
+            success: true,
+            counselors,
+            count: counselors.length
+        });
+    } catch (err) {
+        console.error('Map data error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// Update counselor location (for counselor dashboard)
+router.put('/location/:id', async (req, res) => {
+    try {
+        const { address, city, state, pincode, latitude, longitude, locationEnabled } = req.body;
+
+        const updateData = {
+            address,
+            city,
+            state,
+            pincode,
+            locationEnabled: locationEnabled !== undefined ? locationEnabled : false
+        };
+
+        // Only update coordinates if both lat and lng are provided
+        if (latitude !== undefined && longitude !== undefined) {
+            updateData.location = {
+                type: 'Point',
+                coordinates: [parseFloat(longitude), parseFloat(latitude)]
+            };
+        }
+
+        const counselor = await Counselor.findByIdAndUpdate(
+            req.params.id,
+            updateData,
+            { new: true }
+        );
+
+        if (!counselor) {
+            return res.status(404).json({ success: false, message: 'Counselor not found' });
+        }
+
+        res.json({ success: true, counselor });
+    } catch (err) {
+        console.error('Location update error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 module.exports = router;
